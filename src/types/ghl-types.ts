@@ -2527,6 +2527,11 @@ export interface GHLCreatePostRequest {
   categoryId?: string;
   tiktokPostDetails?: GHLTikTokPostDetails;
   gmbPostDetails?: GHLGMBPostDetails;
+  platformDetails?: {
+    instagram?: { type?: 'feed' | 'story' | 'reel'; };
+    facebook?: { type?: 'post' | 'video' | 'photo'; };
+    linkedin?: { title?: string; link?: string; };
+  };
   userId?: string;
 }
 
