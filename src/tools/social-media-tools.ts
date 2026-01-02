@@ -26,6 +26,28 @@ import {
 } from '../types/ghl-types.js';
 
 export class SocialMediaTools {
+  // CRITICAL FIX: Account ID to User ID mapping for all platforms
+  private readonly ACCOUNT_USER_MAP: Record<string, string> = {
+    // Instagram
+    "6899a0d79ba76f81dfd5a8a7_Q8AartZra4zq0KLYE3pv_17841460047932407": "6899a0e56f817ea9d82ac642",
+    // Facebook
+    "6899a077ce858b5967303c94_Q8AartZra4zq0KLYE3pv_538741682661219_page": "6899a080505038c34ea6b2b6",
+    // LinkedIn Page
+    "6899a10e6f817e668f2ae421_Q8AartZra4zq0KLYE3pv_106422908_page": "6899a1156f817eed5a2ae9d7",
+    // LinkedIn Personal
+    "6899a10e6f817e668f2ae421_Q8AartZra4zq0KLYE3pv_nyjwM8xMvp_profile": "689eb23a233e68d9364d174d",
+    // Threads
+    "690aeaaa4d3e86b4fe97ab08_Q8AartZra4zq0KLYE3pv_24940792358923719_profile": "690aeba3770707192d9fc3bd",
+    // TikTok
+    "689eb3d255bbfc903ed4ce40_Q8AartZra4zq0KLYE3pv_000qG6qCjMKBvRrYwwJou1mEbJs7OQ4L5_business": "689eb3f2233e6891ad4df449",
+    // YouTube
+    "68bce57e74e7453c79525725_Q8AartZra4zq0KLYE3pv_UCW1N70eRtFPNbejfxUqYt4Q_profile": "68bce5899a395c0f326d2e2a",
+    // Google Business
+    "6899a14750503879dea74345_Q8AartZra4zq0KLYE3pv_9102480444095491921": "689eb20c233e686a9f4cff97",
+    // Bluesky
+    "68f8711d98629155ff1c8665_Q8AartZra4zq0KLYE3pv_did:plc:lqkqumsx6ddxwe5m5rrjyhkn_profile": "68f8712b141c8df90a2cb621"
+  };
+
   constructor(private ghlClient: GHLApiClient) {}
 
   getTools(): Tool[] {
@@ -105,7 +127,7 @@ export class SocialMediaTools {
               description: 'Tag IDs to associate with post'
             },
             categoryId: { type: 'string', description: 'Category ID' },
-            userId: { type: 'string', description: 'User ID creating the post' },
+            userId: { type: 'string', description: 'User ID creating the post (optional - will be auto-detected from accountId)' },
             platformDetails: {
               type: 'object',
               description: 'Platform-specific posting parameters (REQUIRED for Instagram carousel)',
@@ -418,7 +440,7 @@ export class SocialMediaTools {
       includeUsers: params.includeUsers?.toString() || 'true',
       postType: params.postType
     });
-    
+
     return {
       success: true,
       posts: response.data?.posts || [],
@@ -428,30 +450,76 @@ export class SocialMediaTools {
   }
 
   private async createSocialPost(params: MCPCreatePostParams) {
-    const response = await this.ghlClient.createSocialPost({
-      accountIds: params.accountIds,
-      summary: params.summary,
-      media: params.media,
-      status: params.status,
-      scheduleDate: params.scheduleDate,
-      followUpComment: params.followUpComment,
-      type: params.type,
-      tags: params.tags,
-      categoryId: params.categoryId,
-      userId: params.userId,
-      platformDetails: params.platformDetails
-    });
+    // Validate accountIds
+    if (!params.accountIds || params.accountIds.length === 0) {
+      throw new Error('accountIds is required and must contain at least one account ID');
+    }
+
+    // CRITICAL FIX: Get userId from params or map it from the first accountId
+    let userId = params.userId;
     
-    return {
-      success: true,
-      post: response.data?.post,
-      message: `Social media post created successfully`
-    };
+    if (!userId) {
+      userId = this.ACCOUNT_USER_MAP[params.accountIds[0]];
+      
+      if (!userId) {
+        throw new Error(
+          `Unknown account ID: ${params.accountIds[0]}. Cannot determine userId. ` +
+          `Available account IDs: ${Object.keys(this.ACCOUNT_USER_MAP).join(', ')}`
+        );
+      }
+    }
+
+    // Ensure type is provided (required by GHL API)
+    const postType = params.type || 'post';
+
+    try {
+      const response = await this.ghlClient.createSocialPost({
+        accountIds: params.accountIds,
+        summary: params.summary,
+        media: params.media || [],
+        status: params.status,
+        scheduleDate: params.scheduleDate,
+        followUpComment: params.followUpComment,
+        type: postType,
+        tags: params.tags,
+        categoryId: params.categoryId,
+        userId: userId,  // CRITICAL: This was missing before!
+        platformDetails: params.platformDetails
+      });
+
+      return {
+        success: true,
+        post: response.data?.post,
+        accountIds: params.accountIds,
+        userId: userId,
+        mediaCount: params.media?.length || 0,
+        message: `Social media post created successfully for ${params.accountIds.length} account(s)`
+      };
+    } catch (error: any) {
+      // Enhanced error handling
+      if (error.response?.status === 400) {
+        return {
+          success: false,
+          error: `Bad Request: ${error.response?.data?.message || 'Invalid post parameters'}`,
+          details: {
+            statusCode: 400,
+            accountIds: params.accountIds,
+            userId: userId,
+            hasMedia: !!params.media && params.media.length > 0,
+            mediaCount: params.media?.length || 0,
+            type: postType,
+            apiResponse: error.response?.data
+          }
+        };
+      }
+      
+      throw error;
+    }
   }
 
   private async getSocialPost(params: MCPGetPostParams) {
     const response = await this.ghlClient.getSocialPost(params.postId);
-    
+
     return {
       success: true,
       post: response.data?.post,
@@ -462,7 +530,7 @@ export class SocialMediaTools {
   private async updateSocialPost(params: MCPUpdatePostParams) {
     const { postId, ...updateData } = params;
     const response = await this.ghlClient.updateSocialPost(postId, updateData);
-    
+
     return {
       success: true,
       message: `Social media post ${postId} updated successfully`
@@ -471,7 +539,7 @@ export class SocialMediaTools {
 
   private async deleteSocialPost(params: MCPDeletePostParams) {
     const response = await this.ghlClient.deleteSocialPost(params.postId);
-    
+
     return {
       success: true,
       message: `Social media post ${params.postId} deleted successfully`
@@ -480,7 +548,7 @@ export class SocialMediaTools {
 
   private async bulkDeleteSocialPosts(params: MCPBulkDeletePostsParams) {
     const response = await this.ghlClient.bulkDeleteSocialPosts({ postIds: params.postIds });
-    
+
     return {
       success: true,
       deletedCount: response.data?.deletedCount || 0,
@@ -490,7 +558,7 @@ export class SocialMediaTools {
 
   private async getSocialAccounts(params: MCPGetAccountsParams) {
     const response = await this.ghlClient.getSocialAccounts();
-    
+
     return {
       success: true,
       accounts: response.data?.accounts || [],
@@ -505,7 +573,7 @@ export class SocialMediaTools {
       params.companyId,
       params.userId
     );
-    
+
     return {
       success: true,
       message: `Social media account ${params.accountId} deleted successfully`
@@ -518,7 +586,7 @@ export class SocialMediaTools {
       params.limit,
       params.skip
     );
-    
+
     return {
       success: true,
       categories: response.data?.categories || [],
@@ -529,7 +597,7 @@ export class SocialMediaTools {
 
   private async getSocialCategory(params: MCPGetCategoryParams) {
     const response = await this.ghlClient.getSocialCategory(params.categoryId);
-    
+
     return {
       success: true,
       category: response.data?.category,
@@ -543,7 +611,7 @@ export class SocialMediaTools {
       params.limit,
       params.skip
     );
-    
+
     return {
       success: true,
       tags: response.data?.tags || [],
@@ -554,7 +622,7 @@ export class SocialMediaTools {
 
   private async getSocialTagsByIds(params: MCPGetTagsByIdsParams) {
     const response = await this.ghlClient.getSocialTagsByIds({ tagIds: params.tagIds });
-    
+
     return {
       success: true,
       tags: response.data?.tags || [],
@@ -570,7 +638,7 @@ export class SocialMediaTools {
       params.page,
       params.reconnect
     );
-    
+
     return {
       success: true,
       oauthData: response.data,
@@ -605,7 +673,7 @@ export class SocialMediaTools {
       default:
         throw new Error(`Unsupported platform: ${params.platform}`);
     }
-    
+
     return {
       success: true,
       platformAccounts: response.data,
