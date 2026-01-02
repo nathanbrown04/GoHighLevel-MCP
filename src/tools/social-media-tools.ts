@@ -23,8 +23,7 @@ import {
   MCPStartOAuthParams,
   MCPGetOAuthAccountsParams,
   MCPAttachOAuthAccountParams
-} 
-from '../types/ghl-types.js';
+} from '../types/ghl-types.js';
 
 export class SocialMediaTools {
   constructor(private ghlClient: GHLApiClient) {}
@@ -107,7 +106,6 @@ export class SocialMediaTools {
             },
             categoryId: { type: 'string', description: 'Category ID' },
             userId: { type: 'string', description: 'User ID creating the post' },
-            // ✅ ADDED: Platform-specific details for Instagram carousel support
             platformDetails: {
               type: 'object',
               description: 'Platform-specific posting parameters (REQUIRED for Instagram carousel)',
@@ -441,7 +439,7 @@ export class SocialMediaTools {
       tags: params.tags,
       categoryId: params.categoryId,
       userId: params.userId,
-      platformDetails: params.platformDetails  // ✅ NOW PASSES platformDetails to API
+      platformDetails: params.platformDetails
     });
     
     return {
