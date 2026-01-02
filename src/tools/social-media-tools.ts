@@ -22,7 +22,9 @@ import {
   MCPGetTagsByIdsParams,
   MCPStartOAuthParams,
   MCPGetOAuthAccountsParams,
-  MCPAttachOAuthAccountParams
+  MCPAttachOAuthAccountParam
+
+s
 } from '../types/ghl-types.js';
 
 export class SocialMediaTools {
@@ -63,7 +65,7 @@ export class SocialMediaTools {
       },
       {
         name: 'create_social_post',
-        description: 'Create a new social media post for multiple platforms',
+        description: 'Create a new social media post for multiple platforms. Supports Instagram carousels with multiple images.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -84,7 +86,7 @@ export class SocialMediaTools {
                 },
                 required: ['url']
               },
-              description: 'Media attachments'
+              description: 'Media attachments (for Instagram carousel: provide multiple image URLs)'
             },
             status: {
               type: 'string',
@@ -105,7 +107,47 @@ export class SocialMediaTools {
               description: 'Tag IDs to associate with post'
             },
             categoryId: { type: 'string', description: 'Category ID' },
-            userId: { type: 'string', description: 'User ID creating the post' }
+            userId: { type: 'string', description: 'User ID creating the post' },
+            // ✅ ADDED: Platform-specific details for Instagram carousel support
+            platformDetails: {
+              type: 'object',
+              description: 'Platform-specific posting parameters (REQUIRED for Instagram carousel)',
+              properties: {
+                instagram: {
+                  type: 'object',
+                  properties: {
+                    type: {
+                      type: 'string',
+                      enum: ['feed', 'story', 'reel'],
+                      description: 'Instagram post type - use "feed" for carousel posts'
+                    }
+                  }
+                },
+                facebook: {
+                  type: 'object',
+                  properties: {
+                    type: {
+                      type: 'string',
+                      enum: ['post', 'video', 'photo'],
+                      description: 'Facebook post type'
+                    }
+                  }
+                },
+                linkedin: {
+                  type: 'object',
+                  properties: {
+                    title: {
+                      type: 'string',
+                      description: 'LinkedIn post title'
+                    },
+                    link: {
+                      type: 'string',
+                      description: 'LinkedIn link URL'
+                    }
+                  }
+                }
+              }
+            }
           },
           required: ['accountIds', 'summary', 'type']
         }
@@ -171,7 +213,6 @@ export class SocialMediaTools {
           required: ['postIds']
         }
       },
-
       // Account Management Tools
       {
         name: 'get_social_accounts',
@@ -195,7 +236,6 @@ export class SocialMediaTools {
           required: ['accountId']
         }
       },
-
       // CSV Operations Tools
       {
         name: 'upload_social_csv',
@@ -241,7 +281,6 @@ export class SocialMediaTools {
           required: ['accountIds', 'filePath', 'rowsCount', 'fileName']
         }
       },
-
       // Categories & Tags Tools
       {
         name: 'get_social_categories',
@@ -293,7 +332,6 @@ export class SocialMediaTools {
           required: ['tagIds']
         }
       },
-
       // OAuth Integration Tools
       {
         name: 'start_social_oauth',
@@ -383,7 +421,7 @@ export class SocialMediaTools {
       includeUsers: params.includeUsers?.toString() || 'true',
       postType: params.postType
     });
-
+    
     return {
       success: true,
       posts: response.data?.posts || [],
@@ -403,9 +441,10 @@ export class SocialMediaTools {
       type: params.type,
       tags: params.tags,
       categoryId: params.categoryId,
-      userId: params.userId
+      userId: params.userId,
+      platformDetails: params.platformDetails  // ✅ NOW PASSES platformDetails to API
     });
-
+    
     return {
       success: true,
       post: response.data?.post,
@@ -544,7 +583,6 @@ export class SocialMediaTools {
 
   private async getPlatformAccounts(params: MCPGetOAuthAccountsParams) {
     let response;
-    
     switch (params.platform) {
       case 'google':
         response = await this.ghlClient.getGoogleBusinessLocations(params.accountId);
@@ -577,4 +615,4 @@ export class SocialMediaTools {
       message: `Retrieved ${params.platform} accounts for OAuth ID ${params.accountId}`
     };
   }
-} 
+}
