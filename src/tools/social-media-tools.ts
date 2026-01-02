@@ -22,10 +22,9 @@ import {
   MCPGetTagsByIdsParams,
   MCPStartOAuthParams,
   MCPGetOAuthAccountsParams,
-  MCPAttachOAuthAccountParam
-
-s
-} from '../types/ghl-types.js';
+  MCPAttachOAuthAccountParams
+} 
+from '../types/ghl-types.js';
 
 export class SocialMediaTools {
   constructor(private ghlClient: GHLApiClient) {}
