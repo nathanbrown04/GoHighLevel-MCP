@@ -351,32 +351,36 @@ class GHLMCPHttpServer {
     });
 
     // SSE endpoint for ChatGPT MCP connection
-  let activeTransport: any = null;
+let activeTransport: any = null;
 
 const handleSSE = async (req: express.Request, res: express.Response) => {
-  const sessionId = req.query.sessionId as string || 'unknown';
-  
-  // IF THIS IS A POST: It's a message for an existing session
+  const sessionId = (req.query.sessionId as string) || 'unknown';
+
+  // --- IF POST: This is Claude sending a command ---
   if (req.method === 'POST') {
-    console.log(`[GHL MCP HTTP] Message received for session: ${sessionId}`);
     if (activeTransport) {
+      console.log(`[GHL MCP HTTP] Processing message for session: ${sessionId}`);
       await activeTransport.handlePostMessage(req, res);
     } else {
-      res.status(404).send('No active session found');
+      console.error(`[GHL MCP HTTP] POST received but no active session found.`);
+      res.status(404).send('No active session');
     }
     return;
   }
 
-  // IF THIS IS A GET: It's a new connection request
-  console.log(`[GHL MCP HTTP] New SSE connection request: ${sessionId}`);
+  // --- IF GET: This is the Bridge opening the initial pipe ---
+  console.log(`[GHL MCP HTTP] Opening new SSE stream for session: ${sessionId}`);
   
   try {
-    // Tells Railway/Nginx not to buffer the stream
-    res.setHeader('X-Accel-Buffering', 'no'); 
-    
-    // Create the transport. We tell the client to POST back to '/sse'
+    // Tells Railway/Nginx not to buffer the stream (CRITICAL)
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    // SSEServerTransport expects the POSTs to come to the same endpoint
     const transport = new SSEServerTransport('/sse', res);
-    activeTransport = transport; // Save it so the POST handler can find it
+    activeTransport = transport; // Save it so the POST logic above can find it
     
     await this.server.connect(transport);
     
@@ -386,12 +390,12 @@ const handleSSE = async (req: express.Request, res: express.Response) => {
     });
     
   } catch (error) {
-    console.error(`[GHL MCP HTTP] SSE Error:`, error);
+    console.error(`[GHL MCP HTTP] SSE Setup Error:`, error);
     if (!res.headersSent) res.status(500).send('Internal Server Error');
   }
 };
 
-// Map the routes correctly
+// Ensure your routes are mapped like this:
 this.app.get('/sse', handleSSE);
 this.app.post('/sse', handleSSE);
 
