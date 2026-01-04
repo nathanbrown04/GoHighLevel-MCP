@@ -124,7 +124,7 @@ class GHLMCPHttpServer {
     }));
 
     // Parse JSON requests
-    this.app.use(express.json());
+    // this.app.use(express.json());
 
     // Request logging
     this.app.use((req, res, next) => {
