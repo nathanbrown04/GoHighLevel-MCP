@@ -351,35 +351,23 @@ class GHLMCPHttpServer {
     });
 
     // SSE endpoint for ChatGPT MCP connection
+let activeTransport: any = null; // Global variable
+
 const handleSSE = async (req: express.Request, res: express.Response) => {
-    // 1. The fix for Railway: Tell the proxy NOT to buffer
     res.setHeader('X-Accel-Buffering', 'no');
-
-    try {
-        // 2. CRITICAL CHANGE: Use the FULL URL for the message endpoint
-        // Claude needs the absolute path to send tool calls back to Railway
-        const transport = new SSEServerTransport(
-            'https://web-production-5c6c5.up.railway.app/messages', 
-            res
-        );
-        
-        await this.server.connect(transport);
-
-        req.on('close', () => {
-            console.log(`[GHL MCP HTTP] Connection closed`);
-        });
-    } catch (error) {
-        console.error(`[GHL MCP HTTP] SSE Error:`, error);
-        if (!res.headersSent) res.status(500).send('Internal Error');
-    }
+    
+    // Use relative path - my script handles the domain now!
+    const transport = new SSEServerTransport('/messages', res);
+    activeTransport = transport;
+    
+    await this.server.connect(transport);
 };
 
-// Ensure your routes are mapped like this:
 this.app.get('/sse', handleSSE);
-// This is the endpoint the transport above points to
-this.app.post('/messages', (req, res) => {
-    // The SDK handles tool calls via POST here automatically 
-    // IF the transport was initialized correctly above
+this.app.post('/messages', async (req, res) => {
+    if (activeTransport) {
+        await activeTransport.handlePostMessage(req, res);
+    }
 });
 
     // Root endpoint with server info
