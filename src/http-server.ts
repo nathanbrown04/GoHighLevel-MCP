@@ -351,53 +351,36 @@ class GHLMCPHttpServer {
     });
 
     // SSE endpoint for ChatGPT MCP connection
-let activeTransport: any = null;
-
 const handleSSE = async (req: express.Request, res: express.Response) => {
-  const sessionId = (req.query.sessionId as string) || 'unknown';
-
-  // --- IF POST: This is Claude sending a command ---
-  if (req.method === 'POST') {
-    if (activeTransport) {
-      console.log(`[GHL MCP HTTP] Processing message for session: ${sessionId}`);
-      await activeTransport.handlePostMessage(req, res);
-    } else {
-      console.error(`[GHL MCP HTTP] POST received but no active session found.`);
-      res.status(404).send('No active session');
-    }
-    return;
-  }
-
-  // --- IF GET: This is the Bridge opening the initial pipe ---
-  console.log(`[GHL MCP HTTP] Opening new SSE stream for session: ${sessionId}`);
-  
-  try {
-    // Tells Railway/Nginx not to buffer the stream (CRITICAL)
+    // 1. The fix for Railway: Tell the proxy NOT to buffer
     res.setHeader('X-Accel-Buffering', 'no');
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
 
-    // SSEServerTransport expects the POSTs to come to the same endpoint
-    const transport = new SSEServerTransport('/sse', res);
-    activeTransport = transport; // Save it so the POST logic above can find it
-    
-    await this.server.connect(transport);
-    
-    req.on('close', () => {
-      console.log(`[GHL MCP HTTP] SSE connection closed: ${sessionId}`);
-      activeTransport = null;
-    });
-    
-  } catch (error) {
-    console.error(`[GHL MCP HTTP] SSE Setup Error:`, error);
-    if (!res.headersSent) res.status(500).send('Internal Server Error');
-  }
+    try {
+        // 2. CRITICAL CHANGE: Use the FULL URL for the message endpoint
+        // Claude needs the absolute path to send tool calls back to Railway
+        const transport = new SSEServerTransport(
+            'https://web-production-5c6c5.up.railway.app/messages', 
+            res
+        );
+        
+        await this.server.connect(transport);
+
+        req.on('close', () => {
+            console.log(`[GHL MCP HTTP] Connection closed`);
+        });
+    } catch (error) {
+        console.error(`[GHL MCP HTTP] SSE Error:`, error);
+        if (!res.headersSent) res.status(500).send('Internal Error');
+    }
 };
 
 // Ensure your routes are mapped like this:
 this.app.get('/sse', handleSSE);
-this.app.post('/sse', handleSSE);
+// This is the endpoint the transport above points to
+this.app.post('/messages', (req, res) => {
+    // The SDK handles tool calls via POST here automatically 
+    // IF the transport was initialized correctly above
+});
 
     // Root endpoint with server info
     this.app.get('/', (req, res) => {
