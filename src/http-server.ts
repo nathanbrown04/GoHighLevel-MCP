@@ -351,25 +351,30 @@ class GHLMCPHttpServer {
     });
 
     // SSE endpoint for ChatGPT MCP connection
-    const handleSSE = async (req: express.Request, res: express.Response) => {
-      const sessionId = req.query.sessionId || 'unknown';
-      console.log(`[GHL MCP HTTP] New SSE connection from: ${req.ip}, sessionId: ${sessionId}, method: ${req.method}`);
-      
-      try {
-        // Create SSE transport (this will set the headers)
-        const transport = new SSEServerTransport('/sse', res);
-        
-        // Connect MCP server to transport
-        await this.server.connect(transport);
-        
-        console.log(`[GHL MCP HTTP] SSE connection established for session: ${sessionId}`);
-        
-        // Handle client disconnect
-        req.on('close', () => {
-          console.log(`[GHL MCP HTTP] SSE connection closed for session: ${sessionId}`);
-        });
-        
-      } catch (error) {
+   const handleSSE = async (req: express.Request, res: express.Response) => {
+  const sessionId = req.query.sessionId || 'unknown';
+  console.log(`[GHL MCP HTTP] New SSE connection from: ${req.ip}, sessionId: ${sessionId}, method: ${req.method}`);
+  
+  try {
+    // --- ADD THIS LINE HERE ---
+    // Tells Railway/Nginx to stop buffering and let the stream flow
+    res.setHeader('X-Accel-Buffering', 'no'); 
+    // --------------------------
+
+    // Create SSE transport (this will set the standard SSE headers)
+    const transport = new SSEServerTransport('/sse', res);
+    
+    // Connect MCP server to transport
+    await this.server.connect(transport);
+    
+    console.log(`[GHL MCP HTTP] SSE connection established for session: ${sessionId}`);
+    
+    // Handle client disconnect
+    req.on('close', () => {
+      console.log(`[GHL MCP HTTP] SSE connection closed for session: ${sessionId}`);
+    });
+    
+  } catch (error) {
         console.error(`[GHL MCP HTTP] SSE connection error for session ${sessionId}:`, error);
         
         // Only send error response if headers haven't been sent yet
