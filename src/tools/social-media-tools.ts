@@ -587,8 +587,9 @@ export class SocialMediaTools {
 
   // --- NEW IMPLEMENTATION METHODS FOR CSV TOOLS ---
 
-  private async uploadCsv(params: MCPUploadCSVParams) {
-    const response = await this.ghlClient.uploadSocialCsv({
+private async uploadCsv(params: MCPUploadCSVParams) {
+    // Call existing method: uploadSocialCSV
+    const response = await this.ghlClient.uploadSocialCSV({
       file: params.file
     });
 
@@ -600,12 +601,14 @@ export class SocialMediaTools {
   }
 
   private async getCsvUploadStatus(params: MCPGetUploadStatusParams) {
-    const response = await this.ghlClient.getSocialCsvStatus({
-      skip: params.skip?.toString(),
-      limit: params.limit?.toString(),
-      includeUsers: params.includeUsers?.toString(),
-      userId: params.userId
-    });
+    // Call existing method: getSocialCSVUploadStatus
+    // Note: Passes arguments individually to match your existing API client signature
+    const response = await this.ghlClient.getSocialCSVUploadStatus(
+      params.skip,
+      params.limit,
+      params.includeUsers,
+      params.userId
+    );
 
     return {
       success: true,
@@ -616,7 +619,8 @@ export class SocialMediaTools {
   }
 
   private async setCsvAccounts(params: MCPSetAccountsParams) {
-    const response = await this.ghlClient.setSocialCsvAccounts({
+    // Call existing method: setSocialCSVAccounts
+    const response = await this.ghlClient.setSocialCSVAccounts({
       accountIds: params.accountIds,
       filePath: params.filePath,
       rowsCount: params.rowsCount,
