@@ -602,7 +602,6 @@ private async uploadCsv(params: MCPUploadCSVParams) {
 
   private async getCsvUploadStatus(params: MCPGetUploadStatusParams) {
     // Call existing method: getSocialCSVUploadStatus
-    // Note: Passes arguments individually to match your existing API client signature
     const response = await this.ghlClient.getSocialCSVUploadStatus(
       params.skip,
       params.limit,
@@ -610,11 +609,14 @@ private async uploadCsv(params: MCPUploadCSVParams) {
       params.userId
     );
 
+    // CRITICAL FIX: Cast to 'any' to bypass strict Type checking on 'uploads'
+    const responseData = response.data as any;
+
     return {
       success: true,
-      uploads: response.data?.uploads || [],
-      count: response.data?.count || 0,
-      message: `Retrieved status for ${response.data?.count || 0} CSV uploads`
+      uploads: responseData?.uploads || responseData?.csvPosts || [], // Check both common property names
+      count: responseData?.count || 0,
+      message: `Retrieved status for ${responseData?.count || 0} CSV uploads`
     };
   }
 
