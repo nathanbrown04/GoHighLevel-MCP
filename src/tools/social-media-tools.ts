@@ -12,17 +12,12 @@ import {
   MCPUploadCSVParams,
   MCPGetUploadStatusParams,
   MCPSetAccountsParams,
-  MCPGetCSVPostParams,
-  MCPFinalizeCSVParams,
-  MCPDeleteCSVParams,
-  MCPDeleteCSVPostParams,
   MCPGetCategoriesParams,
   MCPGetCategoryParams,
   MCPGetTagsParams,
   MCPGetTagsByIdsParams,
   MCPStartOAuthParams,
-  MCPGetOAuthAccountsParams,
-  MCPAttachOAuthAccountParams
+  MCPGetOAuthAccountsParams
 } from '../types/ghl-types.js';
 
 export class SocialMediaTools {
@@ -408,6 +403,16 @@ export class SocialMediaTools {
           return await this.getSocialAccounts(args);
         case 'delete_social_account':
           return await this.deleteSocialAccount(args);
+          
+        // --- ADDED MISSING CSV HANDLERS ---
+        case 'upload_social_csv':
+          return await this.uploadCsv(args);
+        case 'get_csv_upload_status':
+          return await this.getCsvUploadStatus(args);
+        case 'set_csv_accounts':
+          return await this.setCsvAccounts(args);
+        // ----------------------------------
+
         case 'get_social_categories':
           return await this.getSocialCategories(args);
         case 'get_social_category':
@@ -579,6 +584,54 @@ export class SocialMediaTools {
       message: `Social media account ${params.accountId} deleted successfully`
     };
   }
+
+  // --- NEW IMPLEMENTATION METHODS FOR CSV TOOLS ---
+
+  private async uploadCsv(params: MCPUploadCSVParams) {
+    const response = await this.ghlClient.uploadSocialCsv({
+      file: params.file
+    });
+
+    return {
+      success: true,
+      uploadData: response.data,
+      message: `CSV file uploaded successfully`
+    };
+  }
+
+  private async getCsvUploadStatus(params: MCPGetUploadStatusParams) {
+    const response = await this.ghlClient.getSocialCsvStatus({
+      skip: params.skip?.toString(),
+      limit: params.limit?.toString(),
+      includeUsers: params.includeUsers?.toString(),
+      userId: params.userId
+    });
+
+    return {
+      success: true,
+      uploads: response.data?.uploads || [],
+      count: response.data?.count || 0,
+      message: `Retrieved status for ${response.data?.count || 0} CSV uploads`
+    };
+  }
+
+  private async setCsvAccounts(params: MCPSetAccountsParams) {
+    const response = await this.ghlClient.setSocialCsvAccounts({
+      accountIds: params.accountIds,
+      filePath: params.filePath,
+      rowsCount: params.rowsCount,
+      fileName: params.fileName,
+      approver: params.approver,
+      userId: params.userId
+    });
+
+    return {
+      success: true,
+      data: response.data,
+      message: `Accounts set for CSV import successfully`
+    };
+  }
+  // -----------------------------------------------
 
   private async getSocialCategories(params: MCPGetCategoriesParams) {
     const response = await this.ghlClient.getSocialCategories(
