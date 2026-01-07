@@ -4,6 +4,8 @@
  */
 
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
+import FormData from 'form-data';
+import fs from 'fs';
 import {
   GHLConfig,
   GHLContact,
@@ -3080,21 +3082,60 @@ export class GHLApiClient {
   // ===== CSV OPERATIONS =====
 
   /**
-   * Upload CSV for Social Media Posts
-   */
-  async uploadSocialCSV(csvData: GHLUploadCSVRequest): Promise<GHLApiResponse<GHLUploadCSVResponse>> {
-    try {
-      const locationId = this.config.locationId;
-      // Note: This would typically use FormData for file upload
-      const response: AxiosResponse<GHLUploadCSVResponse> = await this.axiosInstance.post(
-        `/social-media-posting/${locationId}/csv`,
-        csvData
-      );
-      return this.wrapResponse(response.data);
-    } catch (error) {
-      throw error;
+ * Upload CSV for Social Media Posts
+ */
+async uploadSocialCSV(csvData: GHLUploadCSVRequest): Promise<GHLApiResponse<GHLUploadCSVResponse>> {
+  try {
+    const locationId = this.config.locationId;
+    
+    // CRITICAL FIX: Use FormData for file upload
+    const FormData = require('form-data');
+    const form = new FormData();
+    
+    // Handle file parameter - could be base64 string or file path
+    if (csvData.file) {
+      if (csvData.file.startsWith('data:')) {
+        // Base64 with data URI
+        const matches = csvData.file.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          const buffer = Buffer.from(matches[2], 'base64');
+          form.append('file', buffer, {
+            filename: 'social-posts.csv',
+            contentType: 'text/csv'
+          });
+        }
+      } else if (csvData.file.length > 1000) {
+        // Plain base64 (no data URI prefix)
+        const buffer = Buffer.from(csvData.file, 'base64');
+        form.append('file', buffer, {
+          filename: 'social-posts.csv',
+          contentType: 'text/csv'
+        });
+      } else {
+        // File path - use filesystem
+        const fs = require('fs');
+        if (fs.existsSync(csvData.file)) {
+          form.append('file', fs.createReadStream(csvData.file));
+        } else {
+          throw new Error(`File not found: ${csvData.file}`);
+        }
+      }
     }
+
+    const response: AxiosResponse<GHLUploadCSVResponse> = await this.axiosInstance.post(
+      `/social-media-posting/${locationId}/csv`,
+      form,
+      {
+        headers: {
+          ...form.getHeaders()
+        }
+      }
+    );
+    return this.wrapResponse(response.data);
+  } catch (error) {
+    throw error;
   }
+}
 
   /**
    * Get CSV Upload Status
